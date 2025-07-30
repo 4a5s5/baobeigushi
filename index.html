@@ -27,9 +27,11 @@
     <meta name="twitter:description" content="LibreTTS AI语音助手，集成智能对话和文本转语音功能。">
     <meta name="twitter:image" content="https://libretts.is-an.org/image/TTS.png">
     
-    <!-- 样式和脚本引用 -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- 样式和脚本引用 - 优化加载 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+          onerror="this.onerror=null;this.href='https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css';">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css"
+          onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';">
     <link rel="stylesheet" href="style.css">
     
     <!-- 网站图标 -->
@@ -41,10 +43,62 @@
     <link rel="preload" href="style.css" as="style">
     <link rel="preload" href="script.js" as="script">
     
+    <!-- 页面加载样式 -->
+    <style>
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        .loader-content {
+            text-align: center;
+            color: white;
+        }
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .page-content {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .page-content.loaded {
+            opacity: 1;
+        }
+    </style>
+    
     <!-- Umami Analytics -->
     <script defer src="https://umami.zwei.de.eu.org/script.js" data-website-id="70106ca4-d1e5-4563-b574-ba09c3b5db16"></script>
 </head>
 <body>
+    <!-- 页面加载器 -->
+    <div id="pageLoader" class="page-loader">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <h4>AI语音助手加载中...</h4>
+            <p>请稍候，正在初始化系统</p>
+        </div>
+    </div>
+
+    <!-- 主要内容 -->
+    <div id="pageContent" class="page-content">
     <!-- 密码验证弹窗 -->
     <div id="passwordModal" class="modal" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index:1000;">
         <div class="modal-dialog" style="max-width: 400px; margin: 15% auto;">
@@ -466,6 +520,7 @@
             <a href="https://yxvm.com/aff.php?aff=819" target="_blank">YXVM</a> 赞助
         </p>
     </footer>
+    </div> <!-- 关闭 pageContent -->
 
     <!-- 密码验证脚本 -->
     <script>
@@ -506,10 +561,103 @@
         });
     </script>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="script.js"></script>
+    <!-- 优化的脚本加载 -->
+    <script>
+        // 页面加载完成后隐藏加载器
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                document.getElementById('pageLoader').style.opacity = '0';
+                document.getElementById('pageContent').classList.add('loaded');
+                setTimeout(function() {
+                    document.getElementById('pageLoader').style.display = 'none';
+                }, 500);
+            }, 500);
+        });
+
+        // 脚本加载错误处理
+        function loadScript(src, fallbackSrc, callback) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = callback;
+            script.onerror = function() {
+                if (fallbackSrc) {
+                    const fallbackScript = document.createElement('script');
+                    fallbackScript.src = fallbackSrc;
+                    fallbackScript.onload = callback;
+                    fallbackScript.onerror = function() {
+                        console.error('Failed to load script:', src, 'and fallback:', fallbackSrc);
+                        if (callback) callback();
+                    };
+                    document.head.appendChild(fallbackScript);
+                } else {
+                    console.error('Failed to load script:', src);
+                    if (callback) callback();
+                }
+            };
+            document.head.appendChild(script);
+        }
+
+        // 按顺序加载脚本
+        loadScript(
+            'https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js',
+            'https://code.jquery.com/jquery-3.5.1.min.js',
+            function() {
+                loadScript(
+                    'https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js',
+                    function() {
+                        loadScript(
+                            'https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js',
+                            'https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js',
+                            function() {
+                                // 最后加载主脚本 - 使用优化版本
+                                const mainScript = document.createElement('script');
+                                mainScript.src = 'script-optimized.js';
+                                mainScript.onload = function() {
+                                    console.log('所有脚本加载完成');
+                                };
+                                mainScript.onerror = function() {
+                                    console.error('主脚本加载失败，尝试加载备用脚本');
+                                    // 尝试加载原始脚本作为备用
+                                    const fallbackScript = document.createElement('script');
+                                    fallbackScript.src = 'script.js';
+                                    fallbackScript.onload = function() {
+                                        console.log('备用脚本加载成功');
+                                    };
+                                    fallbackScript.onerror = function() {
+                                        showErrorToast('脚本加载失败，部分功能可能无法正常使用');
+                                    };
+                                    document.head.appendChild(fallbackScript);
+                                };
+                                document.head.appendChild(mainScript);
+                            }
+                        );
+                    }
+                );
+            }
+        );
+
+        // 错误提示函数
+        function showErrorToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-warning alert-dismissible fade show';
+            toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;max-width:300px;';
+            toast.innerHTML = `
+                ${message}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            `;
+            document.body.appendChild(toast);
+            
+            // 5秒后自动消失
+            setTimeout(function() {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 5000);
+        }
+    </script>
 
 </body>
 </html>
