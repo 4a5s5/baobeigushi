@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/api/*"],
+  "routes": [
+    {
+      "pattern": "/api/tts",
+      "function": "api/tts"
+    },
+    {
+      "pattern": "/api/voices", 
+      "function": "api/voices"
+    },
+    {
+      "pattern": "/api/check-password",
+      "function": "api/check-password"
+    },
+    {
+      "pattern": "/api/verify-password",
+      "function": "api/verify-password"
+    }
+  ]
+}
