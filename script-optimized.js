@@ -307,8 +307,23 @@ function setupEventListeners() {
             $('#aiSettingsModal').modal('show');
         });
         
+        // TTS API管理按钮事件
+        $('#manageApiBtn, #manageChatApiBtn').off('click').on('click', function() {
+            $('#apiManagerModal').modal('show');
+            loadSavedAPIs();
+        });
+        
         $('#saveAiSettings').off('click').on('click', saveAISettings);
         $('#clearChatBtn').off('click').on('click', clearChat);
+        
+        // 自定义API表单提交
+        $('#customApiForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            saveCustomAPI();
+        });
+        
+        // 插入停顿按钮
+        $('#insertPause').off('click').on('click', insertPauseTag);
         
         // TTS相关事件
         $('#generateButton').off('click').on('click', function() {
@@ -858,18 +873,43 @@ function initializeAudioPlayer() {
 }
 
 function loadCustomAPIs() {
-    // 简化版本，避免复杂的自定义API逻辑
-    customAPIs = {};
+    try {
+        const saved = localStorage.getItem('customAPIs');
+        if (saved) {
+            customAPIs = JSON.parse(saved);
+            updateApiOptions();
+        }
+    } catch (error) {
+        console.error('加载自定义API失败:', error);
+        customAPIs = {};
+    }
 }
 
 function updateApiOptions() {
-    // 简化版本，只保留基本API选项
     try {
         const apiSelects = $('#api, #chatApi');
         apiSelects.each(function() {
-            const currentValue = $(this).val();
-            if (!currentValue || (currentValue !== 'edge-api' && currentValue !== 'oai-tts')) {
-                $(this).val('edge-api');
+            const select = $(this);
+            const currentValue = select.val();
+            
+            // 保存当前选择
+            const savedValue = currentValue;
+            
+            // 清空并重新添加选项
+            select.empty();
+            select.append(new Option('Edge API', 'edge-api'));
+            select.append(new Option('OAI-TTS API', 'oai-tts'));
+            
+            // 添加自定义API选项
+            Object.keys(customAPIs).forEach(apiName => {
+                select.append(new Option(customAPIs[apiName].name, apiName));
+            });
+            
+            // 恢复之前的选择
+            if (savedValue && select.find(`option[value="${savedValue}"]`).length) {
+                select.val(savedValue);
+            } else {
+                select.val('edge-api');
             }
         });
     } catch (error) {
@@ -877,13 +917,172 @@ function updateApiOptions() {
     }
 }
 
-// 简化的TTS生成函数
+// TTS API管理功能
+function loadSavedAPIs() {
+    try {
+        const container = $('#savedApisList');
+        container.empty();
+        
+        if (Object.keys(customAPIs).length === 0) {
+            container.append('<p class="text-muted">暂无自定义API</p>');
+            return;
+        }
+        
+        Object.keys(customAPIs).forEach(apiName => {
+            const api = customAPIs[apiName];
+            const item = $(`
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${api.name}</h6>
+                        <small class="text-muted">${api.endpoint}</small>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCustomAPI('${apiName}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `);
+            container.append(item);
+        });
+    } catch (error) {
+        console.error('加载已保存API失败:', error);
+    }
+}
+
+function saveCustomAPI() {
+    try {
+        const name = $('#apiName').val().trim();
+        const format = $('#apiFormat').val();
+        const endpoint = $('#apiEndpoint').val().trim();
+        const apiKey = $('#apiKey').val().trim();
+        const modelEndpoint = $('#modelEndpoint').val().trim();
+        const manualSpeakers = $('#manualSpeakers').val().trim();
+        
+        if (!name || !endpoint) {
+            showError('请填写API名称和端点URL');
+            return;
+        }
+        
+        const apiId = 'custom_' + Date.now();
+        customAPIs[apiId] = {
+            name: name,
+            format: format,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            modelEndpoint: modelEndpoint,
+            speakers: {}
+        };
+        
+        // 处理手动输入的语音列表
+        if (manualSpeakers) {
+            const speakers = manualSpeakers.split(',').map(s => s.trim()).filter(s => s);
+            speakers.forEach(speaker => {
+                customAPIs[apiId].speakers[speaker] = speaker;
+            });
+        }
+        
+        // 保存到localStorage
+        localStorage.setItem('customAPIs', JSON.stringify(customAPIs));
+        
+        // 更新API选项
+        updateApiOptions();
+        
+        // 重新加载已保存的API列表
+        loadSavedAPIs();
+        
+        // 清空表单
+        $('#customApiForm')[0].reset();
+        
+        showInfo('自定义API保存成功');
+    } catch (error) {
+        console.error('保存自定义API失败:', error);
+        showError('保存失败: ' + error.message);
+    }
+}
+
+function deleteCustomAPI(apiId) {
+    if (confirm('确定要删除这个自定义API吗？')) {
+        try {
+            delete customAPIs[apiId];
+            localStorage.setItem('customAPIs', JSON.stringify(customAPIs));
+            updateApiOptions();
+            loadSavedAPIs();
+            showInfo('自定义API已删除');
+        } catch (error) {
+            console.error('删除自定义API失败:', error);
+            showError('删除失败: ' + error.message);
+        }
+    }
+}
+
+// 插入停顿标签功能
+function insertPauseTag() {
+    try {
+        const textarea = $('#text')[0];
+        const pauseSeconds = $('#pauseSeconds').val() || '1.0';
+        
+        if (!textarea) {
+            showError('找不到文本输入框');
+            return;
+        }
+        
+        const pauseTime = parseFloat(pauseSeconds);
+        if (isNaN(pauseTime) || pauseTime <= 0 || pauseTime > 100) {
+            showError('停顿时间必须在0.01到100秒之间');
+            return;
+        }
+        
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const breakTag = `<break time="${pauseTime}s"/>`;
+        
+        const newText = textarea.value.slice(0, start) + breakTag + textarea.value.slice(end);
+        textarea.value = newText;
+        
+        // 更新字符计数
+        updateCharCount();
+        
+        // 设置光标位置
+        const newPos = start + breakTag.length;
+        textarea.focus();
+        textarea.setSelectionRange(newPos, newPos);
+        
+        showInfo('停顿标签已插入');
+    } catch (error) {
+        console.error('插入停顿标签失败:', error);
+        showError('插入失败: ' + error.message);
+    }
+}
+
+// 字符计数更新
+function updateCharCount() {
+    try {
+        const text = $('#text').val() || '';
+        const length = text.length;
+        const maxLength = 100000;
+        const percentage = Math.round((length / maxLength) * 100);
+        
+        $('#charCount').text(`${percentage}% (${length}/${maxLength}字符)`);
+        
+        if (percentage > 90) {
+            $('#charCount').addClass('text-danger');
+        } else if (percentage > 70) {
+            $('#charCount').addClass('text-warning').removeClass('text-danger');
+        } else {
+            $('#charCount').removeClass('text-danger text-warning');
+        }
+    } catch (error) {
+        console.error('更新字符计数失败:', error);
+    }
+}
+
+// 改进的TTS生成函数 - 参考Edge TTS实现
 async function generateVoice(isPreview) {
     if (!canMakeRequest()) return;
     
     try {
         isGenerating = true;
         $('#generateButton, #previewButton').prop('disabled', true);
+        $('#loading').show();
         
         const text = $('#text').val().trim();
         if (!text) {
@@ -901,22 +1100,26 @@ async function generateVoice(isPreview) {
         
         showMessage('正在生成语音...', 'info');
         
-        const audioBlob = await generateTTSAudio(
-            isPreview ? text.substring(0, 20) : text,
-            apiName,
-            voice,
-            parseInt($('#rate').val()) || 0,
-            parseInt($('#pitch').val()) || 0
-        );
+        // 根据API类型构建请求参数
+        const requestData = buildTTSRequest(text, apiName, voice, isPreview);
+        
+        const audioBlob = await callTTSAPI(apiName, requestData);
         
         if (audioBlob) {
             if (currentAudioURL) {
                 URL.revokeObjectURL(currentAudioURL);
             }
             currentAudioURL = URL.createObjectURL(audioBlob);
+            
+            // 更新UI
             $('#result').show();
             $('#audio').attr('src', currentAudioURL);
             $('#download').removeClass('disabled').attr('href', currentAudioURL);
+            
+            // 保存到历史记录
+            if (!isPreview) {
+                saveToHistory(text, voice, currentAudioURL);
+            }
             
             showMessage(isPreview ? '试听生成成功' : '语音生成成功', 'info');
         }
@@ -927,8 +1130,177 @@ async function generateVoice(isPreview) {
     } finally {
         isGenerating = false;
         $('#generateButton, #previewButton').prop('disabled', false);
+        $('#loading').hide();
     }
 }
+
+// 构建TTS请求参数
+function buildTTSRequest(text, apiName, voice, isPreview) {
+    const processedText = isPreview ? text.substring(0, 50) + '...' : text;
+    
+    if (apiName === 'oai-tts') {
+        // OpenAI TTS格式
+        return {
+            model: 'tts-1',
+            input: processedText,
+            voice: voice,
+            speed: 1.0,
+            response_format: $('#audioFormat').val() || 'mp3'
+        };
+    } else if (customAPIs[apiName] && customAPIs[apiName].format === 'openai') {
+        // 自定义OpenAI格式API
+        return {
+            model: 'tts-1',
+            input: processedText,
+            voice: voice,
+            speed: 1.0
+        };
+    } else {
+        // Edge API格式（默认）
+        return {
+            text: processedText,
+            voice: voice,
+            rate: parseInt($('#rate').val()) || 0,
+            pitch: parseInt($('#pitch').val()) || 0,
+            api: apiName,
+            format: 'mp3',
+            preview: isPreview
+        };
+    }
+}
+
+// 调用TTS API
+async function callTTSAPI(apiName, requestData) {
+    let apiUrl;
+    let headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    if (apiName === 'oai-tts') {
+        apiUrl = 'https://oai-tts.zwei.de.eu.org/v1/audio/speech';
+    } else if (customAPIs[apiName]) {
+        apiUrl = customAPIs[apiName].endpoint;
+        if (customAPIs[apiName].apiKey) {
+            headers['Authorization'] = `Bearer ${customAPIs[apiName].apiKey}`;
+        }
+    } else {
+        // 默认使用本地API
+        apiUrl = '/api/tts';
+    }
+    
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`API请求失败: ${response.status} - ${errorText || response.statusText}`);
+    }
+    
+    return await response.blob();
+}
+
+// 保存到历史记录
+function saveToHistory(text, voice, audioUrl) {
+    try {
+        const history = JSON.parse(localStorage.getItem('ttsHistory') || '[]');
+        const item = {
+            id: Date.now(),
+            text: text.length > 50 ? text.substring(0, 50) + '...' : text,
+            fullText: text,
+            voice: voice,
+            audioUrl: audioUrl,
+            timestamp: new Date().toLocaleString()
+        };
+        
+        history.unshift(item);
+        
+        // 只保留最近20条记录
+        if (history.length > 20) {
+            history.splice(20);
+        }
+        
+        localStorage.setItem('ttsHistory', JSON.stringify(history));
+        updateHistoryDisplay();
+    } catch (error) {
+        console.error('保存历史记录失败:', error);
+    }
+}
+
+// 更新历史记录显示
+function updateHistoryDisplay() {
+    try {
+        const history = JSON.parse(localStorage.getItem('ttsHistory') || '[]');
+        const container = $('#historyItems');
+        container.empty();
+        
+        if (history.length === 0) {
+            container.append('<p class="text-muted text-center">暂无历史记录</p>');
+            return;
+        }
+        
+        history.forEach(item => {
+            const historyItem = $(`
+                <div class="card mb-2">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted">${item.timestamp}</small>
+                                <p class="mb-1 small">${item.text}</p>
+                                <small class="text-info">${item.voice}</small>
+                            </div>
+                            <div class="btn-group-vertical btn-group-sm">
+                                <button class="btn btn-outline-primary btn-sm" onclick="playHistoryItem('${item.audioUrl}')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="downloadHistoryItem('${item.audioUrl}', '${item.id}')">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="reuseHistoryItem('${item.fullText}', '${item.voice}')">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+            container.append(historyItem);
+        });
+    } catch (error) {
+        console.error('更新历史记录显示失败:', error);
+    }
+}
+
+// 历史记录相关函数
+window.playHistoryItem = function(audioUrl) {
+    const audio = $('#audio')[0];
+    audio.src = audioUrl;
+    audio.play();
+};
+
+window.downloadHistoryItem = function(audioUrl, itemId) {
+    const link = document.createElement('a');
+    link.href = audioUrl;
+    link.download = `tts-${itemId}.mp3`;
+    link.click();
+};
+
+window.reuseHistoryItem = function(text, voice) {
+    $('#text').val(text);
+    $('#speaker').val(voice);
+    updateCharCount();
+    showInfo('已恢复历史记录内容');
+};
+
+window.clearHistory = function() {
+    if (confirm('确定要清空所有历史记录吗？')) {
+        localStorage.removeItem('ttsHistory');
+        updateHistoryDisplay();
+        showInfo('历史记录已清空');
+    }
+};
 
 // 页面加载完成后初始化
 $(document).ready(function() {
