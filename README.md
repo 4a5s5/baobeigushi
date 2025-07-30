@@ -26,8 +26,7 @@
 │       ├── check-password.js  # 密码检查API
 │       └── verify-password.js # 密码验证API
 ├── _routes.json        # 路由配置
-├── _headers            # HTTP头配置
-└── wrangler.toml       # Cloudflare配置
+└── _headers            # HTTP头配置
 ```
 
 ### 2. 部署到 Cloudflare Pages
