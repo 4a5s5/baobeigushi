@@ -4,20 +4,24 @@
   "exclude": ["/api/*"],
   "routes": [
     {
-      "pattern": "/api/tts",
-      "function": "api/tts"
+      "src": "/api/tts",
+      "dest": "/functions/api/tts.js"
     },
     {
-      "pattern": "/api/voices", 
-      "function": "api/voices"
+      "src": "/api/voices",
+      "dest": "/functions/api/voices.js"
     },
     {
-      "pattern": "/api/check-password",
-      "function": "api/check-password"
+      "src": "/api/check-password",
+      "dest": "/functions/api/check-password.js"
     },
     {
-      "pattern": "/api/verify-password",
-      "function": "api/verify-password"
+      "src": "/api/verify-password",
+      "dest": "/functions/api/verify-password.js"
+    },
+    {
+      "src": "/*",
+      "dest": "/index.html"
     }
   ]
 }

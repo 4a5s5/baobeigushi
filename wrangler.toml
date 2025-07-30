@@ -1,0 +1,25 @@
+# Cloudflare Pages 配置文件
+
+# 基本配置
+name = "baobeigushi"
+compatibility_date = "2023-10-30"
+main = "functions/_worker.js"
+
+# 构建配置
+[build]
+command = ""  # 无需构建命令，直接部署静态文件
+
+# 环境变量
+[vars]
+REQUIRE_PASSWORD = "false"  # 是否需要密码访问
+PASSWORD = ""  # 访问密码，如需启用请设置
+
+# 路由配置
+[routes]
+pattern = "/*"
+zone_name = ""
+custom_domain = true
+
+# 函数配置
+[functions]
+directory = "functions"

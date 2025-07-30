@@ -261,7 +261,7 @@
         </div>
 
         <!-- TTS模式 -->
-        <div id="ttsMode" class="mode-container" style="display: none;">
+        <div id="ttsMode" class="mode-container" style="display: none;" v-cloak>
             <div class="row w-100 justify-content-center g-4">
                 <!-- 表单容器 -->
                 <div class="col-12 col-md-8 col-lg-6 col-xl-5 mb-3">
@@ -273,42 +273,27 @@
                             <form id="text2voice-form">
                                 <div class="form-row">
                                     <div class="form-group col-md-6">
-                                        <label for="api">选择API：</label>
-                                        <div class="input-group">
-                                            <select class="form-control" id="api" required>
-                                                <option value="edge-api">Edge API</option>
-                                                <option value="oai-tts">OAI-TTS API</option>
-                                            </select>
-                                            <div class="input-group-append">
-                                                <button class="btn btn-outline-secondary" type="button" id="manageApiBtn">
-                                                    <i class="fas fa-cog"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <small id="apiTips" class="form-text text-muted"></small>
+                                        <label for="voice">选择语音：</label>
+                                        <select class="form-control" id="voice" v-model="form.voice" @change="saveForm" required>
+                                            <option v-for="(name, key) in voiceOptions" :key="key" :value="key">{{ name }}</option>
+                                        </select>
                                     </div>
                                     <div class="form-group col-md-6">
-                                        <label for="speaker">选择语音：</label>
-                                        <select class="form-control" id="speaker" required>
-                                            <option value="">加载中...</option>
-                                        </select>
+                                        <label>语速：</label>
+                                        <div class="slider-group">
+                                            <input type="range" v-model.number="form.speed" @input="saveForm" min="0.25" max="2.0" step="0.05" class="form-control-range">
+                                            <span>{{ speedDisplay }}</span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div class="form-group">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label for="text">输入文本：</label>
-                                        <div id="pauseControls" class="input-group" style="width: auto;">
-                                            <input type="number"
-                                                   class="form-control form-control-sm"
-                                                   id="pauseSeconds"
-                                                   min="0.01"
-                                                   max="100"
-                                                   step="0.01"
-                                                   style="width: 80px;"
-                                                   placeholder="秒数">
+                                        <label for="inputText">输入文本：</label>
+                                        <div class="input-group" style="width: auto;">
+                                            <input type="number" v-model.number="pauseTime" min="0.01" max="100" step="0.01" placeholder="停顿时长" class="form-control form-control-sm" style="width: 80px;">
                                             <div class="input-group-append">
-                                                <button class="btn btn-sm btn-outline-secondary" type="button" id="insertPause">
+                                                <button type="button" @click="insertPause" class="btn btn-sm btn-outline-secondary">
                                                     插入停顿
                                                 </button>
                                             </div>
@@ -316,57 +301,52 @@
                                     </div>
                                     <textarea
                                         class="form-control"
-                                        id="text"
+                                        id="inputText"
+                                        ref="textareaRef"
+                                        v-model="form.inputText"
+                                        @input="saveForm"
                                         rows="4"
                                         required
-                                        maxlength="100000"></textarea>
-                                    <small id="charCount" class="form-text text-muted">0% (0/100000单位)</small>
+                                        maxlength="100000"
+                                        placeholder="请在这里输入要转换的文本..."></textarea>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <small class="form-text text-muted">{{ charCount }} 字符</small>
+                                        <button type="button" @click="clearText" class="btn btn-sm btn-link">清除</button>
+                                    </div>
                                 </div>
 
-                                <!-- OAI-TTS专用设置 -->
-                                <div id="instructionsContainer" class="form-group" style="display: none;">
-                                    <label for="instructions">语音指令（可选）：</label>
-                                    <input type="text" class="form-control" id="instructions" 
-                                        placeholder="如：请用欢快和兴奋的语气说话">
-                                    <small class="form-text text-muted">可用于指导语音情感、语气或风格</small>
+                                <div class="form-group">
+                                    <label>音调：</label>
+                                    <div class="slider-group">
+                                        <input type="range" v-model.number="form.pitch" @input="saveForm" min="0.5" max="1.5" step="0.05" class="form-control-range">
+                                        <span>{{ pitchDisplay }}</span>
+                                    </div>
                                 </div>
 
-                                <div id="formatContainer" class="form-group" style="display: none;">
-                                    <label for="audioFormat">音频格式：</label>
-                                    <select class="form-control" id="audioFormat">
-                                        <option value="mp3">MP3</option>
-                                        <option value="opus">Opus</option>
-                                        <option value="aac">AAC</option>
-                                        <option value="flac">FLAC</option>
-                                        <option value="wav">WAV</option>
-                                        <option value="pcm">PCM</option>
-                                    </select>
+                                <div class="status" :class="['alert', 'alert-' + (status.type === 'error' ? 'danger' : status.type), { 'd-none': !status.show }]">
+                                    {{ status.message }}
                                 </div>
 
-                                <!-- 其他API使用的语速语调设置 -->
-                                <div id="rateContainer" class="form-group">
-                                    <label for="rate">语速: <span id="rateValue">0</span></label>
-                                    <input type="range" class="form-control-range" id="rate" name="rate" min="-100" max="100" value="0">
+                                <div class="button-group">
+                                    <button type="button" class="btn btn-info btn-block mb-3" :disabled="isLoading" @click="generateSpeech(true)">
+                                        <span v-if="isLoading" class="spinner-border spinner-border-sm mr-2"></span>
+                                        {{ isLoading ? '生成中...' : '试听前50个字' }}
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-block" :disabled="isLoading" @click="generateSpeech(false)">
+                                        <span v-if="isLoading" class="spinner-border spinner-border-sm mr-2"></span>
+                                        {{ isLoading ? '生成中...' : '生成完整语音' }}
+                                    </button>
                                 </div>
-
-                                <div id="pitchContainer" class="form-group">
-                                    <label for="pitch">语调: <span id="pitchValue">0</span></label>
-                                    <input type="range" class="form-control-range" id="pitch" name="pitch" min="-100" max="100" value="0">
-                                </div>
-
-                                <div id="error" class="alert alert-danger" style="display: none;"></div>
-
-                                <button type="button" class="btn btn-info btn-block mb-3" id="previewButton">试听前20个字</button>
-                                <button type="button" class="btn btn-primary btn-block" id="generateButton">生成语音</button>
                             </form>
 
-                            <div class="mt-4" id="result">
-                                <audio id="audio" controls class="w-100"></audio>
-                                <a id="download" class="btn btn-success btn-block mt-3" href="#" download="voice.mp3">下载语音文件</a>
-                            </div>
-
-                            <div class="mt-4 text-center" id="loading" style="display: none;">
-                                <i class="fas fa-spinner fa-spin"></i> 正在生成语音，请稍候...
+                            <div class="mt-4" v-show="audioSrc">
+                                <audio ref="audioPlayer" controls class="w-100" :src="audioSrc" @loadstart="onAudioLoadStart" @canplay="onAudioCanPlay"></audio>
+                                
+                                <div v-if="showDownloadBtn" class="text-center mt-3">
+                                    <button class="btn btn-success btn-block" @click="downloadAudio">
+                                        <i class="fas fa-download"></i> 下载音频文件
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -612,24 +592,54 @@
                             function() {
                                 // 最后加载主脚本 - 使用优化版本
                                 const mainScript = document.createElement('script');
-                                mainScript.src = 'script-optimized.js';
-                                mainScript.onload = function() {
-                                    console.log('所有脚本加载完成');
+                                // 加载模式切换脚本
+                                const modeSwitchScript = document.createElement('script');
+                                modeSwitchScript.src = 'script-mode-switch.js';
+                                modeSwitchScript.onload = function() {
+                                    console.log('模式切换脚本加载完成');
                                 };
-                                mainScript.onerror = function() {
-                                    console.error('主脚本加载失败，尝试加载备用脚本');
-                                    // 尝试加载原始脚本作为备用
-                                    const fallbackScript = document.createElement('script');
-                                    fallbackScript.src = 'script.js';
-                                    fallbackScript.onload = function() {
+                                document.head.appendChild(modeSwitchScript);
+                                
+                                // 加载Vue3和Edge TTS脚本
+                                const vueScript = document.createElement('script');
+                                vueScript.src = 'https://unpkg.com/vue@3/dist/vue.global.js';
+                                vueScript.onload = function() {
+                                    console.log('Vue3加载完成');
+                                    // Vue3加载完成后，加载Edge TTS脚本
+                                    const edgeScript = document.createElement('script');
+                                    edgeScript.src = 'script-edge-tts.js';
+                                    edgeScript.onload = function() {
+                                        console.log('Edge TTS脚本加载完成');
+                                    };
+                                    edgeScript.onerror = function() {
+                                        console.error('Edge TTS脚本加载失败');
+                                        showErrorToast('TTS功能加载失败');
+                                        // 尝试加载备用脚本
+                                        loadBackupScript();
+                                    };
+                                    document.head.appendChild(edgeScript);
+                                };
+                                vueScript.onerror = function() {
+                                    console.error('Vue3加载失败');
+                                    showErrorToast('Vue3加载失败，使用备用脚本');
+                                    // 加载备用脚本
+                                    loadBackupScript();
+                                };
+                                document.head.appendChild(vueScript);
+                                
+                                // 加载备用脚本的函数
+                                function loadBackupScript() {
+                                    const backupScript = document.createElement('script');
+                                    backupScript.src = 'script-optimized.js';
+                                    backupScript.onload = function() {
                                         console.log('备用脚本加载成功');
                                     };
-                                    fallbackScript.onerror = function() {
+                                    backupScript.onerror = function() {
+                                        console.error('备用脚本加载失败');
                                         showErrorToast('脚本加载失败，部分功能可能无法正常使用');
                                     };
-                                    document.head.appendChild(fallbackScript);
-                                };
-                                document.head.appendChild(mainScript);
+                                    document.head.appendChild(backupScript);
+                                }
                             }
                         );
                     }

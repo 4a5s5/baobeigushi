@@ -1,111 +1,63 @@
-export async function onRequest(context) {
-  const { request } = context;
-  
-  // 处理 CORS 预检请求
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
+// 语音列表API处理模块
+
+export async function handleVoices(request, env) {
+  try {
+    if (request.method === 'OPTIONS') {
+      return handleCORS();
+    }
+    
+    // 返回预定义的语音列表
+    const voices = {
+      'zh-CN-XiaoxiaoNeural': '中文女声 (晓晓)',
+      'zh-CN-YunxiNeural': '中文男声 (云希)',
+      'zh-CN-YunyangNeural': '中文男声 (云扬)',
+      'zh-CN-XiaoyiNeural': '中文女声 (晓伊)',
+      'zh-CN-YunjianNeural': '中文男声 (云健)',
+      'zh-CN-XiaochenNeural': '中文女声 (晓辰)',
+      'zh-CN-XiaohanNeural': '中文女声 (晓涵)',
+      'zh-CN-XiaomengNeural': '中文女声 (晓梦)',
+      'zh-CN-XiaomoNeural': '中文女声 (晓墨)',
+      'zh-CN-XiaoqiuNeural': '中文女声 (晓秋)',
+      'zh-CN-XiaoruiNeural': '中文女声 (晓睿)',
+      'zh-CN-XiaoshuangNeural': '中文女声 (晓双)',
+      'zh-CN-XiaoxuanNeural': '中文女声 (晓萱)',
+      'zh-CN-XiaoyanNeural': '中文女声 (晓颜)',
+      'zh-CN-XiaoyouNeural': '中文女声 (晓悠)',
+      'zh-CN-XiaozhenNeural': '中文女声 (晓甄)',
+      'zh-CN-YunfengNeural': '中文男声 (云枫)',
+      'zh-CN-YunhaoNeural': '中文男声 (云皓)',
+      'zh-CN-YunxiaNeural': '中文男声 (云夏)',
+      'zh-CN-YunyeNeural': '中文男声 (云野)',
+      'zh-CN-YunzeNeural': '中文男声 (云泽)',
+      'en-US-JennyNeural': '英文女声 (Jenny)',
+      'en-US-GuyNeural': '英文男声 (Guy)',
+      'en-US-AriaNeural': '英文女声 (Aria)',
+      'en-US-DavisNeural': '英文男声 (Davis)'
+    };
+    
+    return new Response(JSON.stringify(voices), {
       headers: {
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-auth-token',
-      },
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }
     });
-  }
-  
-  // 只允许 GET 请求
-  if (request.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  }
-  
-  try {
-    const url = new URL(request.url);
-    const localeFilter = (url.searchParams.get('l') || "").toLowerCase();
-    const format = url.searchParams.get('f');
-    
-    let voices = await voiceList();
-    if (localeFilter) {
-      voices = voices.filter(item => item.Locale.toLowerCase().includes(localeFilter));
-    }
-    
-    if (format === "0") {
-      const formattedVoices = voices.map(item => formatVoiceItem(item));
-      return new Response(formattedVoices.join("\n"), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    } else if (format === "1") {
-      const voiceMap = Object.fromEntries(voices.map(item => [item.ShortName, item.LocalName]));
-      return new Response(JSON.stringify(voiceMap), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    } else {
-      return new Response(JSON.stringify(voices), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    }
   } catch (error) {
-    console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Failed to fetch voices" }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    console.error('语音列表API错误:', error);
+    return new Response(`获取语音列表失败: ${error.message}`, { status: 500 });
   }
 }
 
-function formatVoiceItem(item) {
-  return `
-- !!org.nobody.multitts.tts.speaker.Speaker
-  avatar: ''
-  code: ${item.ShortName}
-  desc: ''
-  extendUI: ''
-  gender: ${item.Gender === "Female" ? "0" : "1"}
-  name: ${item.LocalName}
-  note: 'wpm: ${item.WordsPerMinute || ""}'
-  param: ''
-  sampleRate: ${item.SampleRateHertz || "24000"}
-  speed: 1.5
-  type: 1
-  volume: 1`;
-}
-
-async function voiceList() {
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "X-Ms-Useragent": "SpeechStudio/2021.05.001",
-    "Content-Type": "application/json",
-    "Origin": "https://azure.microsoft.com",
-    "Referer": "https://azure.microsoft.com"
-  };
-  
-  const response = await fetch("https://eastus.api.speech.microsoft.com/cognitiveservices/voices/list", {
-    headers: headers
+// 处理CORS预检请求
+function handleCORS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400'
+    }
   });
-  
-  if (!response.ok) {
-    throw new Error(`获取语音列表失败，状态码 ${response.status}`);
-  }
-  
-  return await response.json();
 }
